@@ -41,6 +41,10 @@ test(
             },
             amount: 12.34,
             member: "",
+            contributions: [
+              { member: "Test Alex", amount: 8 },
+              { member: "Test Maria", amount: 4.34 },
+            ],
             date: "",
             settled: false,
             receiptId: "",
@@ -57,6 +61,10 @@ test(
       assert.equal(
         saved.state.expenses.find((e: { id: string }) => e.id === id)?.amount,
         12.34,
+      );
+      assert.deepEqual(
+        saved.state.expenses.find((e: { id: string }) => e.id === id)?.contributions,
+        [{ member: "Test Alex", amount: 8 }, { member: "Test Maria", amount: 4.34 }],
       );
       const stale = await fetch(base + "/api/state", {
         method: "PUT",

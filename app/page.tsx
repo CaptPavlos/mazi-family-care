@@ -37,6 +37,9 @@ import {
   canEdit,
   demoState,
   driveUrl,
+  expenseContributions,
+  memberExpenseTotal,
+  uncoveredExpense,
   folderId,
   mergeConditions,
   regionSchema,
@@ -441,11 +444,22 @@ export default function Home() {
         };
         break;
       case "expenses":
+        const contributions = expensePayers.map((member, index) => ({
+          member,
+          amount: Number(val(`contribution-${index}`)),
+        })).filter((share) => share.amount > 0);
+        if (contributions.reduce((sum, share) => sum + Math.round(share.amount * 100), 0) > Math.round(Number(val("amount")) * 100)) {
+          const amountInput = event.currentTarget.elements.namedItem("amount") as HTMLInputElement;
+          amountInput.setCustomValidity(t.contributionError);
+          amountInput.reportValidity();
+          return;
+        }
         row = {
           id,
           title: text("title"),
           amount: Number(val("amount")),
-          member: val("member"),
+          member: "",
+          contributions,
           date: val("date"),
           settled: checked("settled"),
           receiptId: val("receiptId"),
@@ -472,6 +486,14 @@ export default function Home() {
     ? (data[modal.kind].find((x) => x.id === modal.id) as unknown as
         Record<string, unknown> | undefined)
     : undefined;
+  const currentExpense = modal?.kind === "expenses"
+    ? data.expenses.find((expense) => expense.id === modal.id)
+    : undefined;
+  const currentContributions = currentExpense ? expenseContributions(currentExpense) : [];
+  const expensePayers = [...new Set([
+    ...data.members.map((member) => member.name),
+    ...currentContributions.map((share) => share.member),
+  ])];
   const defaultValue = (key: string) => {
     const v = current?.[key];
     return v && typeof v === "object" ? l(v as LocalText) : String(v ?? "");
@@ -1234,7 +1256,7 @@ export default function Home() {
                           <tr>
                             <th>{t.title}</th>
                             <th>{t.date}</th>
-                            <th>{t.paidBy}</th>
+                            <th>{t.coveredBy}</th>
                             <th>{t.status}</th>
                             <th>{t.amount}</th>
                             <th>
@@ -1260,7 +1282,13 @@ export default function Home() {
                                 )}
                               </td>
                               <td>{formatDate(e.date, lang)}</td>
-                              <td>{e.member || "—"}</td>
+                              <td>
+                                {expenseContributions(e).map((share) => (
+                                  <div key={share.member}>{share.member} · {money(share.amount)}</div>
+                                ))}
+                                {uncoveredExpense(e) > 0 && <small>{t.uncovered} · {money(uncoveredExpense(e))}</small>}
+                                {!e.amount && !expenseContributions(e).length && "—"}
+                              </td>
                               <td>
                                 <span
                                   className={`badge ${e.settled ? "history" : "planned"}`}
@@ -1300,9 +1328,7 @@ export default function Home() {
                         <span className="grow">{m.name}</span>
                         <strong>
                           {money(
-                            data.expenses
-                              .filter((e) => e.member === m.name)
-                              .reduce((s, e) => s + e.amount, 0),
+                            memberExpenseTotal(data.expenses, m.name),
                           )}
                         </strong>
                       </div>
@@ -1624,7 +1650,11 @@ export default function Home() {
           </button>
         </div>
         {modal && (
-          <form key={`${modal.kind}-${modal.id || "new"}`} onSubmit={submit}>
+          <form key={`${modal.kind}-${modal.id || "new"}`} onSubmit={submit}
+            onInput={(event) => {
+              const amountInput = event.currentTarget.elements.namedItem("amount");
+              if (amountInput instanceof HTMLInputElement) amountInput.setCustomValidity("");
+            }}>
             <div className="dialog-fields">
               {error && (
                 <div className="notice error" role="alert">
@@ -1751,13 +1781,33 @@ export default function Home() {
                   {modal.kind === "appointments" && (
                     <Field name="location" label={t.location} />
                   )}{" "}
-                  {modal.kind !== "conditions" && <MemberSelect />}
+                  {modal.kind !== "conditions" && modal.kind !== "expenses" && <MemberSelect />}
                   {(modal.kind === "tasks" ||
                     modal.kind === "appointments") && (
                     <Checkbox name="done" label={t.completed} />
                   )}{" "}
                   {modal.kind === "expenses" && (
                     <>
+                      <fieldset className="expense-contributions">
+                        <legend>{t.contributions}</legend>
+                        <p>{expensePayers.length ? t.contributionHint : t.addMemberForExpenses}</p>
+                        <div className="form-columns">
+                          {expensePayers.map((member, index) => (
+                            <label className="field" key={member}>
+                              {member} (€)
+                              <input
+                                name={`contribution-${index}`}
+                                type="number"
+                                min="0"
+                                max="10000000"
+                                step="0.01"
+                                defaultValue={currentContributions.find((share) => share.member === member)?.amount ?? ""}
+                                placeholder="0.00"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
                       <label className="field">
                         {t.receipt}
                         <select

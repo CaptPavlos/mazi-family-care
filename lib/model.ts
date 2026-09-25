@@ -69,10 +69,29 @@ export const expenseSchema = z.object({
   title: textSchema,
   amount: z.number().min(0).max(1e7),
   member: z.string().max(100),
+  contributions: z.array(z.object({
+    member: z.string().min(1).max(100),
+    amount: z.number().min(0).max(1e7).multipleOf(0.01),
+  })).max(60).optional(),
   date,
   settled: z.boolean(),
   receiptId: z.string().max(200),
-});
+}).refine((expense) => {
+  const shares = expense.contributions ?? [];
+  return new Set(shares.map((share) => share.member)).size === shares.length &&
+    shares.reduce((sum, share) => sum + Math.round(share.amount * 100), 0) <= Math.round(expense.amount * 100);
+}, "Contributions must have unique members and cannot exceed the expense total");
+export function expenseContributions(expense: z.infer<typeof expenseSchema>) {
+  return expense.contributions ?? (expense.member ? [{ member: expense.member, amount: expense.amount }] : []);
+}
+export function uncoveredExpense(expense: z.infer<typeof expenseSchema>) {
+  return Math.max(0, Math.round(expense.amount * 100) - expenseContributions(expense)
+    .reduce((sum, share) => sum + Math.round(share.amount * 100), 0)) / 100;
+}
+export function memberExpenseTotal(expenses: z.infer<typeof expenseSchema>[], member: string) {
+  return expenses.flatMap(expenseContributions).filter((share) => share.member === member)
+    .reduce((sum, share) => sum + Math.round(share.amount * 100), 0) / 100;
+}
 export const memberSchema = z.object({
   id,
   name: z.string().min(1).max(100),

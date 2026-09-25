@@ -1411,6 +1411,15 @@ dialog::backdrop {
   grid-template-columns: 1fr 1fr;
   gap: 15px;
 }
+.expense-contributions {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 0;
+}
+.expense-contributions legend { font-weight: 600; padding: 0 6px; }
+.expense-contributions p { font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+.expense-contributions .form-columns { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .checkbox-label {
   display: flex;
   gap: 10px;
