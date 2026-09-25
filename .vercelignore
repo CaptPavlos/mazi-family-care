@@ -1,0 +1,6 @@
+.private
+.env.local
+.env
+test-results
+playwright-report
+tests
